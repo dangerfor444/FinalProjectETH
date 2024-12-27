@@ -1,78 +1,126 @@
-//SPDX-License-Identifier: MIT
-pragma solidity >=0.8.0 <0.9.0;
-
-// Useful for debugging. Remove when deploying to a live network.
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+ 
 import "hardhat/console.sol";
-
-// Use openzeppelin to inherit battle-tested implementations (ERC20, ERC721, etc)
-// import "@openzeppelin/contracts/access/Ownable.sol";
-
+ 
 /**
- * A smart contract that allows changing a state variable of the contract and tracking the changes
- * It also allows the owner to withdraw the Ether in the contract
- * @author BuidlGuidl
+ * @title YourContract
+ * @dev Контракт для создания и оплаты счетов (invoice).
  */
 contract YourContract {
-    // State Variables
-    address public immutable owner;
-    string public greeting = "Building Unstoppable Apps!!!";
-    bool public premium = false;
-    uint256 public totalCounter = 0;
-    mapping(address => uint) public userGreetingCounter;
-
-    // Events: a way to emit log statements from smart contract that can be listened to by external parties
-    event GreetingChange(address indexed greetingSetter, string newGreeting, bool premium, uint256 value);
-
-    // Constructor: Called once on contract deployment
-    // Check packages/hardhat/deploy/00_deploy_your_contract.ts
-    constructor(address _owner) {
-        owner = _owner;
-    }
-
-    // Modifier: used to define a set of rules that must be met before or after a function is executed
-    // Check the withdraw() function
-    modifier isOwner() {
-        // msg.sender: predefined variable that represents address of the account that called the current function
-        require(msg.sender == owner, "Not the Owner");
-        _;
-    }
-
+    /// @notice Счётчик созданных инвойсов
+    uint256 public invoiceCount;
+ 
     /**
-     * Function that allows anyone to change the state variable "greeting" of the contract and increase the counters
-     *
-     * @param _newGreeting (string memory) - new greeting to save on the contract
+     * @dev Структура хранения данных об одном инвойсе:
+     * @param recipient кому платим (адрес, который получит средства при оплате)
+     * @param description текстовое описание, за что платим
+     * @param amount сумма, которую надо оплатить (в wei)
+     * @param paid флаг, оплачен ли инвойс
      */
-    function setGreeting(string memory _newGreeting) public payable {
-        // Print data to the hardhat chain console. Remove when deploying to a live network.
-        console.log("Setting new greeting '%s' from %s", _newGreeting, msg.sender);
-
-        // Change state variables
-        greeting = _newGreeting;
-        totalCounter += 1;
-        userGreetingCounter[msg.sender] += 1;
-
-        // msg.value: built-in global variable that represents the amount of ether sent with the transaction
-        if (msg.value > 0) {
-            premium = true;
-        } else {
-            premium = false;
-        }
-
-        // emit: keyword used to trigger an event
-        emit GreetingChange(msg.sender, _newGreeting, msg.value > 0, msg.value);
+    struct Invoice {
+        address recipient;
+        string description;
+        uint256 amount;
+        bool paid;
     }
-
+ 
+    /// @dev Хранилище всех инвойсов
+    mapping(uint256 => Invoice) public invoices;
+ 
+    /// @dev События
+    event InvoiceCreated(
+        uint256 indexed invoiceId,
+        address indexed recipient,
+        uint256 amount,
+        string description
+    );
+    event InvoicePaid(
+        uint256 indexed invoiceId,
+        address indexed payer,
+        uint256 amount
+    );
+    
     /**
-     * Function that allows the owner to withdraw all the Ether in the contract
-     * The function can only be called by the owner of the contract as defined by the isOwner modifier
+     * @dev Конструктор 
      */
-    function withdraw() public isOwner {
-        (bool success, ) = owner.call{ value: address(this).balance }("");
-        require(success, "Failed to send Ether");
+    constructor() {
+        console.log("YourContract deployed");
     }
-
+ 
     /**
-     * Function that allows the contract to receive ETH
+     * @notice Создать инвойс
+     * @param _recipient адрес, которому платим
+     * @param _description описание инвойса
+     * @param _amount сумма в wei (1 ETH = 10^18 wei)
+     * @return invoiceId уникальный ID созданного инвойса
      */
-    receive() external payable {}
+    function createInvoice(
+        address _recipient,
+        string memory _description,
+        uint256 _amount
+    ) external returns (uint256 invoiceId) {
+        require(_recipient != address(0), "Recipient is zero address");
+        require(_amount > 0, "Amount must be > 0");
+ 
+        invoiceId = invoiceCount;
+        invoices[invoiceId] = Invoice({
+            recipient: _recipient,
+            description: _description,
+            amount: _amount,
+            paid: false
+        });
+        invoiceCount++;
+ 
+        emit InvoiceCreated(invoiceId, _recipient, _amount, _description);
+        console.log("Invoice %s created for recipient %s, amount %s", invoiceId, _recipient, _amount);
+    }
+ 
+    /**
+     * @notice Оплатить инвойс, отправив ETH на адрес, указанный при создании
+     * @param _invoiceId ID инвойса
+     */
+    function payInvoice(uint256 _invoiceId) external payable {
+        // Проверяем, существует ли инвойс (invoiceId < invoiceCount)
+        require(_invoiceId < invoiceCount, "Invoice does not exist");
+        Invoice storage inv = invoices[_invoiceId];
+ 
+        require(!inv.paid, "Invoice already paid");
+        require(msg.value >= inv.amount, "Not enough ETH to pay invoice");
+ 
+        // Помечаем как оплаченный
+        inv.paid = true;
+ 
+        // Отправляем ETH получателю
+        (bool success, ) = inv.recipient.call{value: msg.value}("");
+        require(success, "Transfer failed");
+ 
+        emit InvoicePaid(_invoiceId, msg.sender, msg.value);
+        console.log("Invoice %s paid by %s, amount %s", _invoiceId, msg.sender, msg.value);
+    }
+ 
+    /**
+     * @notice Фолбэк-функция, чтобы контракт мог принимать ETH напрямую
+     */
+    receive() external payable {
+        console.log("Received ETH:", msg.value);
+    }
+ 
+    /**
+     * @notice Для отладки: возвращает информацию об инвойсе
+     */
+    function getInvoice(uint256 _invoiceId)
+        external
+        view
+        returns (
+            address recipient,
+            string memory description,
+            uint256 amount,
+            bool paid
+        )
+    {
+        require(_invoiceId < invoiceCount, "Invoice does not exist");
+        Invoice memory inv = invoices[_invoiceId];
+        return (inv.recipient, inv.description, inv.amount, inv.paid);
+    }
 }

@@ -9,24 +9,109 @@
 
 body {
   min-height: 100vh;
+  font-family: 'Arial', sans-serif;
+  color: #333;
 }
 
-h1,
-h2,
-h3,
-h4 {
+h1, h2, h3, h4 {
   margin-bottom: 0.5rem;
-  line-height: 1;
+  line-height: 1.2;
+}
+
+h1 {
+  @apply text-3xl font-bold text-center my-6 text-gray-800;
+}
+
+h2 {
+  @apply text-2xl font-semibold text-gray-700 mt-8 mb-4;
 }
 
 p {
   margin: 1rem 0;
+  font-size: 1rem;
+}
+
+.mt-8{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: center;
+}
+
+input {
+  @apply border border-gray-300 rounded-md p-2 text-gray-900 mb-2;
+  transition: border-color 0.3s;
+  width: 500px;
+}
+
+ul {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+input:focus {
+  @apply border-blue-500 outline-none;
 }
 
 .btn {
-  @apply shadow-md;
+  @apply shadow-md py-2 px-4 rounded-md text-white transition-colors duration-300;
 }
 
-.btn.btn-ghost {
-  @apply shadow-none;
+.btn-primary {
+  @apply bg-blue-500 hover:bg-blue-600;
+}
+
+.btn-secondary {
+  @apply bg-green-500 hover:bg-green-600;
+}
+
+.invoice-list {
+  list-style-type: none; 
+  padding: 0; 
+  gap: 15px;
+  align-items: center;
+}
+
+.invoice-item {
+  display: flex; 
+  justify-content: space-between; 
+  padding: 10px; 
+  margin: 5px 0; 
+  border: 1px solid #e0e0e0; 
+  border-radius: 5px; 
+  background-color: #f9f9f9; 
+  transition: background-color 0.3s;
+  gap: 15px;
+}
+
+.invoice-item:hover {
+  background-color: #eff; 
+}
+
+.btn-accent {
+  @apply bg-red-500 hover:bg-red-600;
+}
+
+ul {
+  @apply list-disc list-inside pl-5;
+}
+
+li {
+  @apply my-1;
+}
+
+/* Additional styling for responsive design */
+@media (max-width: 640px) {
+  h1, h2 {
+    text-align: center;
+  }
+
+  input {
+    width: 100%;
+  }
+
+  .btn {
+    width: 100%;
+  }
 }
